@@ -1,0 +1,537 @@
+import 'package:flutter/material.dart';
+import 'package:food_app/providers/cart_provider.dart';
+import 'package:provider/provider.dart';
+import 'package:food_app/pages/order.dart';
+import 'package:intl/intl.dart';
+
+class Details extends StatefulWidget {
+  final Map<String, dynamic> product;
+
+  const Details({Key? key, required this.product}) : super(key: key);
+
+  @override
+  State<Details> createState() => _DetailsState();
+}
+
+class _DetailsState extends State<Details> {
+  int quantity = 1;
+  final int discount = 15;
+
+  void _incrementQuantity() {
+    setState(() {
+      quantity++;
+    });
+  }
+
+  void _decrementQuantity() {
+    if (quantity > 1) {
+      setState(() {
+        quantity--;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cartProvider = Provider.of<CartProvider>(context, listen: false);
+
+    // Kiểm tra và chuyển đổi giá từ String sang double nếu cần
+    double originalPrice;
+    if (widget.product["Price"] is String) {
+      originalPrice = double.tryParse(widget.product["Price"]) ?? 0;
+    } else {
+      originalPrice = (widget.product["Price"] ?? 0).toDouble();
+    }
+
+    final discountedPrice = originalPrice * (1 - discount / 100);
+
+    // Định dạng giá tiền với đơn vị tiền tệ Việt Nam
+    final formattedOriginalPrice = NumberFormat.currency(
+      locale: 'vi_VN',
+      symbol: '₫',
+      decimalDigits: 0,
+    ).format(originalPrice);
+
+    final formattedDiscountedPrice = NumberFormat.currency(
+      locale: 'vi_VN',
+      symbol: '₫',
+      decimalDigits: 0,
+    ).format(discountedPrice);
+
+    print("Product details: ${widget.product}");
+    print("Original price: $originalPrice");
+    print("Discounted price: $discountedPrice");
+
+    return Scaffold(
+      backgroundColor: Colors.grey[100],
+      appBar: AppBar(
+        title: Text("Chi tiết sản phẩm"),
+        backgroundColor: Color(0xFFff5722),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.share_outlined),
+            onPressed: () {},
+          ),
+          IconButton(
+            icon: Icon(Icons.favorite_border),
+            onPressed: () {},
+          ),
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Stack(
+              children: [
+                IconButton(
+                  icon: Icon(Icons.shopping_cart_outlined),
+                  onPressed: () {
+                    // Lấy danh sách sản phẩm mới nhất từ CartProvider
+                    final cartItems =
+                        Provider.of<CartProvider>(context, listen: false)
+                            .cartItems;
+
+                    // Chuyển đến trang Order và truyền danh sách sản phẩm
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => Order(cartItems: cartItems),
+                      ),
+                    );
+                  },
+                ),
+                if (cartProvider.itemCount > 0)
+                  Positioned(
+                    right: 5,
+                    top: 5,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 14,
+                        minHeight: 14,
+                      ),
+                      child: Text(
+                        '${cartProvider.itemCount}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 8,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Ảnh sản phẩm
+                  AspectRatio(
+                    aspectRatio: 1,
+                    child: _buildProductImage(widget.product['ImagePath']),
+                  ),
+
+                  // Thông tin giá và tên sản phẩm
+                  Container(
+                    padding: EdgeInsets.all(15),
+                    color: Colors.white,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                              child: Text(
+                                '$discount% GIẢM',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          discount > 0
+                              ? formattedDiscountedPrice
+                              : formattedOriginalPrice,
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red,
+                          ),
+                        ),
+                        if (discount > 0)
+                          Row(
+                            children: [
+                              Text(
+                                formattedOriginalPrice,
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 16,
+                                  decoration: TextDecoration.lineThrough,
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Tiết kiệm ₫${(originalPrice - discountedPrice).toStringAsFixed(0)}',
+                                style: TextStyle(
+                                  color: Colors.red,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        SizedBox(height: 12),
+                        Text(
+                          widget.product["Name"] ?? "Unknown",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(Icons.star, color: Colors.amber, size: 18),
+                            Icon(Icons.star, color: Colors.amber, size: 18),
+                            Icon(Icons.star, color: Colors.amber, size: 18),
+                            Icon(Icons.star, color: Colors.amber, size: 18),
+                            Icon(Icons.star_half,
+                                color: Colors.amber, size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                              '4.8',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            SizedBox(width: 15),
+                            Text(
+                              'Đã bán 157',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: 10),
+
+                  // Vận chuyển
+                  Container(
+                    padding: EdgeInsets.all(15),
+                    color: Colors.white,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.local_shipping_outlined,
+                                size: 20, color: Colors.grey[700]),
+                            SizedBox(width: 10),
+                            Text(
+                              'Vận chuyển',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 10),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Miễn phí vận chuyển',
+                              style: TextStyle(
+                                fontSize: 14,
+                              ),
+                            ),
+                            Text(
+                              'Giao hàng trong 24h',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: 10),
+
+                  // Số lượng
+                  Container(
+                    padding: EdgeInsets.all(15),
+                    color: Colors.white,
+                    child: Row(
+                      children: [
+                        Text(
+                          'Số lượng',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        SizedBox(width: 20),
+                        Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey[300]!),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            children: [
+                              InkWell(
+                                onTap: _decrementQuantity,
+                                child: Container(
+                                  padding: EdgeInsets.all(8),
+                                  child: Icon(Icons.remove, size: 16),
+                                ),
+                              ),
+                              Container(
+                                padding: EdgeInsets.symmetric(horizontal: 12),
+                                decoration: BoxDecoration(
+                                  border: Border(
+                                    left: BorderSide(color: Colors.grey[300]!),
+                                    right: BorderSide(color: Colors.grey[300]!),
+                                  ),
+                                ),
+                                child: Text(
+                                  quantity.toString(),
+                                  style: TextStyle(fontSize: 16),
+                                ),
+                              ),
+                              InkWell(
+                                onTap: _incrementQuantity,
+                                child: Container(
+                                  padding: EdgeInsets.all(8),
+                                  child: Icon(Icons.add, size: 16),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: 10),
+
+                  // Mô tả sản phẩm
+                  Container(
+                    padding: EdgeInsets.all(15),
+                    color: Colors.white,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Mô tả sản phẩm',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          widget.product["Description"] ?? "Không có mô tả",
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[800],
+                            height: 1.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Bottom bar với nút thêm vào giỏ hàng
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 5,
+                  offset: Offset(0, -1),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey[300]!),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: IconButton(
+                    icon: Icon(Icons.chat_outlined),
+                    onPressed: () {},
+                  ),
+                ),
+                SizedBox(width: 10),
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey[300]!),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: IconButton(
+                    icon: Icon(Icons.shopping_cart_outlined),
+                    onPressed: () {},
+                  ),
+                ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFFff5722),
+                      foregroundColor: Colors.white,
+                      minimumSize: Size(double.infinity, 50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: () {
+                      // In ra id để debug
+                      print(
+                          'Adding product to cart with id: ${widget.product["id"]}');
+                      print(
+                          'Product id type: ${widget.product["id"].runtimeType}');
+
+                      // Thêm tham số forceAdd = true để luôn thêm mới sản phẩm
+                      cartProvider.addToCart({
+                        "id": widget.product["id"] ?? "1",
+                        "name": widget.product["Name"],
+                        "price": discountedPrice,
+                        "image": widget.product["ImagePath"],
+                      }, quantity, forceAdd: true);
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Đã thêm vào giỏ hàng'),
+                          duration: Duration(seconds: 1),
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      );
+                    },
+                    child: Text(
+                      'Thêm vào giỏ hàng',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+Widget _buildProductImage(dynamic imagePathValue) {
+  final imagePath = imagePathValue?.toString().trim() ?? '';
+
+  if (imagePath.isEmpty) {
+    return Container(
+      color: Colors.grey[300],
+      child: Icon(Icons.image_not_supported,
+          size: 50, color: Colors.grey[600]),
+    );
+  }
+
+  if (imagePath.startsWith('assets/')) {
+    return Image.asset(
+      imagePath,
+      width: double.infinity,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return Container(
+          color: Colors.grey[300],
+          child: Icon(Icons.image_not_supported,
+              size: 50, color: Colors.grey[600]),
+        );
+      },
+    );
+  }
+
+  if (imagePath.startsWith('http://') ||
+      imagePath.startsWith('https://') ||
+      imagePath.startsWith('/uploads/')) {
+    final normalizedUrl = imagePath.startsWith('/uploads/')
+        ? 'http://localhost:3001$imagePath'
+        : imagePath;
+
+    return Image.network(
+      normalizedUrl,
+      width: double.infinity,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return Container(
+          color: Colors.grey[300],
+          child: Icon(Icons.image_not_supported,
+              size: 50, color: Colors.grey[600]),
+        );
+      },
+    );
+  }
+
+  return Image.asset(
+    'images/banner.png',
+    width: double.infinity,
+    fit: BoxFit.cover,
+    errorBuilder: (context, error, stackTrace) {
+      return Container(
+        color: Colors.grey[300],
+        child: Icon(Icons.image_not_supported,
+            size: 50, color: Colors.grey[600]),
+      );
+    },
+  );
+}
+
+
+
+
+
+
