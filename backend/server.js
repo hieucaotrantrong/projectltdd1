@@ -28,6 +28,62 @@ const pool = mysql.createPool({
   queueLimit: 0
 });
 
+async function ensureCoreTables() {
+  const statements = [
+    `CREATE TABLE IF NOT EXISTS chat_messages (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      sender VARCHAR(20) NOT NULL,
+      message TEXT NOT NULL,
+      is_read BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS notifications (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      title VARCHAR(255) NOT NULL,
+      message TEXT NOT NULL,
+      is_read BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS wallets (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL UNIQUE,
+      balance DECIMAL(10, 2) NOT NULL DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS wallet_transactions (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      amount DECIMAL(10, 2) NOT NULL,
+      type VARCHAR(50) NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'pending',
+      description VARCHAR(255),
+      reference_id INT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NULL DEFAULT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS wallet_topups (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      amount DECIMAL(10, 2) NOT NULL,
+      payment_method VARCHAR(50) NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NULL DEFAULT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )`
+  ];
+
+  for (const statement of statements) {
+    await pool.query(statement);
+  }
+}
+
 async function testDatabaseConnection() {
   try {
     const connection = await pool.getConnection();
@@ -51,6 +107,13 @@ async function startServer() {
   const dbConnected = await testDatabaseConnection();
 
   if (dbConnected) {
+    try {
+      await ensureCoreTables();
+      console.log('Core tables verified');
+    } catch (error) {
+      console.error('Failed to verify core tables:', error);
+    }
+
     server = app.listen(port, '0.0.0.0', () => {
       console.log(`Server running on port ${port}`);
       console.log(`Server is accessible at:`);
@@ -1334,6 +1397,8 @@ app.post('/api/upload-product-image', productUpload.single('image'), async (req,
 
 app.get('/api/users/:userId/notifications', async (req, res) => {
   try {
+    await ensureCoreTables();
+
     const userId = req.params.userId;
 
 
@@ -1366,6 +1431,8 @@ API đánh dấu thông báo đã đọc
 --------------------------------------*/
 app.put('/api/notifications/:id/read', async (req, res) => {
   try {
+    await ensureCoreTables();
+
     const notificationId = req.params.id;
 
 
@@ -1390,6 +1457,8 @@ app.put('/api/notifications/:id/read', async (req, res) => {
 
 app.put('/api/users/:userId/notifications/read-all', async (req, res) => {
   try {
+    await ensureCoreTables();
+
     const userId = req.params.userId;
 
     await pool.query(
@@ -1414,6 +1483,8 @@ app.put('/api/users/:userId/notifications/read-all', async (req, res) => {
 
 app.get('/api/chat/messages/:userId', async (req, res) => {
   try {
+    await ensureCoreTables();
+
     const userId = req.params.userId;
 
 
@@ -1449,6 +1520,8 @@ app.get('/api/chat/messages/:userId', async (req, res) => {
 app.post('/api/chat/messages', async (req, res) => {
 
   try {
+    await ensureCoreTables();
+
     const { userId, message, sender } = req.body;
 
     if (!userId || !message || !sender) {
@@ -1483,6 +1556,8 @@ app.post('/api/chat/messages', async (req, res) => {
 -----------------------------------*/
 app.get('/api/chat/users', async (req, res) => {
   try {
+    await ensureCoreTables();
+
     const [users] = await pool.query(`
       SELECT DISTINCT cm.user_id, u.name as user_name,
         (SELECT message FROM chat_messages 
@@ -1513,6 +1588,8 @@ app.get('/api/chat/users', async (req, res) => {
 
 app.post('/api/chat/mark-read', async (req, res) => {
   try {
+    await ensureCoreTables();
+
     const { userId, sender } = req.body;
 
 
@@ -1533,6 +1610,28 @@ app.post('/api/chat/mark-read', async (req, res) => {
     });
   } catch (error) {
 
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+app.get('/api/chat/unread-count/:userId', async (req, res) => {
+  try {
+    await ensureCoreTables();
+
+    const userId = req.params.userId;
+
+    const [rows] = await pool.query(
+      `SELECT COUNT(*) as unread_count
+       FROM chat_messages
+       WHERE user_id = ? AND sender = 'admin' AND is_read = 0`,
+      [userId]
+    );
+
+    res.json({
+      status: 'success',
+      unread_count: rows[0]?.unread_count || 0,
+    });
+  } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
   }
 });

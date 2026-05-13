@@ -11,7 +11,7 @@ class SharedPreferenceHelper {
   Future<bool> saveUserData(
       String userId, String userName, String userEmail, String role) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setString(userIdKey, userId);
+    await prefs.setString(userIdKey, userId.toString());
     await prefs.setString(userNameKey, userName);
     await prefs.setString(userEmailKey, userEmail);
     await prefs.setString(userRoleKey, role);
@@ -22,9 +22,19 @@ class SharedPreferenceHelper {
   // Lấy thông tin người dùng
   Future<String?> getUserId() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? userId = prefs.getString(userIdKey);
+    final dynamic userIdValue = prefs.get(userIdKey);
 
-    return userId;
+    if (userIdValue == null) {
+      return null;
+    }
+
+    if (userIdValue is String) {
+      return userIdValue;
+    }
+
+    final normalizedUserId = userIdValue.toString();
+    await prefs.setString(userIdKey, normalizedUserId);
+    return normalizedUserId;
   }
 
   // Lấy tên người dùng
